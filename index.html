@@ -1,877 +1,140 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>용접 안전 점검 시스템</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
-<style>
-  :root {
-    --green: #1D9E75;
-    --green-dark: #0F6E56;
-    --green-light: #EAF3DE;
-    --green-text: #3B6D11;
-    --red: #E24B4A;
-    --red-light: #FCEBEB;
-    --red-text: #A32D2D;
-    --blue-light: #E6F1FB;
-    --blue-text: #185FA5;
-    --yellow-light: #FAEEDA;
-    --yellow-text: #854F0B;
-    --bg: #F2F4F6;
-    --bg2: #FFFFFF;
-    --bg3: #F7F8FA;
-    --border: #E2E5EB;
-    --border2: #CBD0D9;
-    --text1: #1A1D23;
-    --text2: #5A6070;
-    --text3: #9199A8;
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --shadow: 0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
-  }
+/*************************************************************
+ * 용접 안전 점검 시스템 - 구글 시트 연동 백엔드 (무료)
+ * ---------------------------------------------------------
+ * [사용법]
+ * 1) 구글 드라이브에서 새 [구글 스프레드시트] 1개를 만든다.
+ * 2) 상단 메뉴 [확장 프로그램] > [Apps Script] 클릭.
+ * 3) 기본 코드를 전부 지우고 이 파일 내용을 그대로 붙여넣는다.
+ * 4) 상단 [배포] > [새 배포] > 유형 '웹 앱' 선택
+ *      - 실행 계정: 나
+ *      - 액세스 권한: '모든 사용자'(익명 포함)
+ *    [배포] 클릭 후 나오는 '웹 앱 URL'(.../exec)을 복사한다.
+ * 5) 용접안전점검시스템 HTML 파일 안의
+ *      CONFIG = { GAS_URL: 'https://script.google.com/macros/s/AKfycbxFsjmey7KbZBtCtcgEi4Zg-264L0TA_l9xAJRI0ZH-2kc4qkOH7J4Em-HPWoRblIXvow/exec' }
+ *    따옴표 안에 복사한 URL을 붙여넣는다.
+ * 끝! 이제 학생이 제출할 때마다 날짜별 시트에 자동 기록되고,
+ * 사진/서명은 드라이브에 저장된 뒤 링크가 시트에 들어갑니다.
+ *************************************************************/
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+// 사진·서명 이미지를 저장할 드라이브 폴더 이름
+var DRIVE_FOLDER = '용접안전점검_증빙자료';
 
-  body {
-    font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
-    background: var(--bg);
-    min-height: 100vh;
-    color: var(--text1);
-    font-size: 15px;
-    line-height: 1.5;
-  }
-
-  /* ── Screens ── */
-  .screen { display: none; min-height: 100vh; padding: 1.5rem 1rem; }
-  .screen.active { display: block; }
-
-  /* ── Card ── */
-  .card {
-    background: var(--bg2);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 1.25rem;
-    box-shadow: var(--shadow);
-  }
-
-  /* ── Buttons ── */
-  .btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 10px 18px; border-radius: var(--radius-md);
-    border: 0.5px solid var(--border2);
-    background: var(--bg2); color: var(--text1);
-    font-size: 14px; font-family: inherit; cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
-    text-decoration: none;
-  }
-  .btn:hover { background: var(--bg3); }
-  .btn:active { transform: scale(0.98); }
-  .btn-primary { background: var(--green); color: #fff; border-color: var(--green-dark); }
-  .btn-primary:hover { background: var(--green-dark); }
-  .btn-sm { padding: 6px 12px; font-size: 13px; border-radius: var(--radius-sm); }
-  .btn-block { width: 100%; justify-content: center; }
-
-  /* ── Form Inputs ── */
-  input[type=text], input[type=password], select {
-    width: 100%; padding: 11px 14px;
-    border: 0.5px solid var(--border2);
-    border-radius: var(--radius-md);
-    background: var(--bg2); color: var(--text1);
-    font-size: 15px; font-family: inherit;
-    transition: border-color 0.15s;
-    appearance: none; -webkit-appearance: none;
-  }
-  input[type=text]:focus, input[type=password]:focus, select:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(29,158,117,0.12); }
-  label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 6px; }
-  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A6070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
-
-  /* ── Badge ── */
-  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-  .badge-ok { background: var(--green-light); color: var(--green-text); }
-  .badge-fail { background: var(--red-light); color: var(--red-text); }
-  .badge-pending { background: var(--yellow-light); color: var(--yellow-text); }
-
-  /* ── Login ── */
-  #loginScreen { display: flex; align-items: flex-start; justify-content: center; padding-top: 3rem; }
-  .login-wrap { width: min(420px, 100%); }
-  .login-logo { width: 68px; height: 68px; background: var(--green); border-radius: 18px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 34px; box-shadow: 0 4px 20px rgba(29,158,117,0.3); }
-  .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .role-btn {
-    padding: 16px 12px; border-radius: var(--radius-md);
-    border: 1.5px solid var(--border); background: var(--bg3);
-    cursor: pointer; text-align: center; transition: all 0.15s;
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-  }
-  .role-btn:hover { border-color: var(--green); background: var(--green-light); }
-  .role-btn.selected { border-color: var(--green); background: var(--green-light); color: var(--green-text); }
-  .role-btn .emoji { font-size: 28px; }
-  .role-btn .label { font-size: 14px; font-weight: 500; color: var(--text1); }
-
-  /* ── Name Grid ── */
-  .name-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; max-height: 200px; overflow-y: auto; padding: 2px; }
-  .name-chip {
-    padding: 9px 4px; border-radius: var(--radius-sm);
-    border: 0.5px solid var(--border); background: var(--bg3);
-    color: var(--text1); font-size: 13px; cursor: pointer;
-    text-align: center; transition: all 0.12s; font-family: inherit;
-  }
-  .name-chip:hover { background: var(--green-light); border-color: var(--green); color: var(--green-text); }
-  .name-chip.selected { background: var(--green); border-color: var(--green-dark); color: #fff; font-weight: 600; }
-
-  /* ── Error msg ── */
-  .err-msg { color: var(--red); font-size: 13px; margin-top: 8px; text-align: center; display: none; }
-
-  /* ── Student Screen ── */
-  #studentScreen { padding-top: 1.25rem; }
-  .stu-wrap { max-width: 500px; margin: 0 auto; }
-  .header-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem; }
-  .header-logo { width: 44px; height: 44px; background: var(--green); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
-
-  /* ── Step dots ── */
-  .step-dots { display: flex; gap: 7px; margin-bottom: 1.25rem; align-items: center; }
-  .step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); transition: all 0.3s; }
-  .step-dot.done { background: var(--green); }
-  .step-dot.active { background: var(--green); width: 22px; border-radius: 4px; box-shadow: 0 0 0 3px rgba(29,158,117,0.15); }
-
-  /* ── Check Items ── */
-  .check-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; border-bottom: 0.5px solid var(--border); }
-  .check-item:last-child { border-bottom: none; }
-  .check-icon { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
-  .check-toggle { display: flex; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
-  .toggle-btn {
-    padding: 7px 16px; border-radius: 20px;
-    border: 0.5px solid var(--border2); background: var(--bg3);
-    color: var(--text2); font-size: 13px; cursor: pointer; font-family: inherit;
-    transition: all 0.15s;
-  }
-  .toggle-btn:hover { background: var(--bg); }
-  .toggle-btn.yes { background: var(--green-light); color: var(--green-text); border-color: #8BBF4A; font-weight: 500; }
-  .toggle-btn.no { background: var(--red-light); color: var(--red-text); border-color: var(--red); font-weight: 500; }
-
-  /* ── Upload ── */
-  .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .upload-area {
-    border: 1.5px dashed var(--border2); border-radius: var(--radius-md);
-    padding: 1.25rem; text-align: center; cursor: pointer;
-    transition: all 0.15s; position: relative; overflow: hidden;
-  }
-  .upload-area:hover { background: var(--bg3); border-color: var(--green); }
-  .upload-area input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  .preview-img { width: 100%; max-height: 130px; object-fit: cover; border-radius: var(--radius-sm); margin-top: 8px; display: none; }
-
-  /* ── Signature ── */
-  #sigCanvas {
-    width: 100%; height: 155px; display: block;
-    background: var(--bg3); border-radius: var(--radius-sm);
-    border: 0.5px solid var(--border2); cursor: crosshair; touch-action: none;
-  }
-  .sig-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-
-  /* ── Success modal overlay inside student screen ── */
-  .modal-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.45); z-index: 200;
-    align-items: center; justify-content: center;
-  }
-  .modal-overlay.open { display: flex; }
-  .modal-box {
-    background: var(--bg2); border-radius: var(--radius-lg);
-    padding: 2rem 1.5rem; width: min(360px, 90vw); text-align: center;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
-    animation: popIn 0.25s ease;
-  }
-  @keyframes popIn { from { transform: scale(0.88); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-  /* ── Teacher Screen ── */
-  #teacherScreen { padding-top: 1.25rem; }
-  .teacher-wrap { max-width: 680px; margin: 0 auto; }
-  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1rem; }
-  .stat-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-md); padding: 1rem; text-align: center; box-shadow: var(--shadow); }
-  .stat-num { font-size: 28px; font-weight: 600; }
-  .stat-label { font-size: 12px; color: var(--text2); margin-top: 3px; }
-
-  /* ── Tabs ── */
-  .tab-bar { display: flex; gap: 4px; margin-bottom: 1rem; }
-  .tab { padding: 8px 16px; border-radius: var(--radius-md); border: 0.5px solid transparent; font-size: 14px; cursor: pointer; color: var(--text2); font-family: inherit; background: transparent; }
-  .tab.active { background: var(--bg2); border-color: var(--border); color: var(--text1); font-weight: 600; box-shadow: var(--shadow); }
-
-  /* ── Filter chips ── */
-  .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
-  .filter-chip { padding: 5px 12px; border-radius: 20px; border: 0.5px solid var(--border2); font-size: 12px; cursor: pointer; color: var(--text2); background: var(--bg2); font-family: inherit; transition: all 0.12s; }
-  .filter-chip.on { background: var(--green); color: #fff; border-color: var(--green-dark); font-weight: 600; }
-  .filter-chip:hover:not(.on) { border-color: var(--green); color: var(--green-text); background: var(--green-light); }
-
-  /* ── Student Row ── */
-  .student-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 0.5px solid var(--border); }
-  .student-row:last-child { border-bottom: none; }
-  .avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--blue-light); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: var(--blue-text); flex-shrink: 0; }
-  .progress-bar { height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; flex: 1; min-width: 40px; }
-  .progress-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.4s; }
-
-  /* ── Detail ── */
-  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1rem; }
-  .detail-chip { padding: 10px 12px; border-radius: var(--radius-sm); font-size: 13px; }
-  .chip-ok { background: var(--green-light); color: var(--green-text); }
-  .chip-fail { background: var(--red-light); color: var(--red-text); }
-
-  /* ── Misc ── */
-  .divider { height: 0.5px; background: var(--border); margin: 1rem 0; }
-  .empty-state { color: var(--text2); font-size: 14px; text-align: center; padding: 2.5rem 1rem; }
-  .sec-label { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
-  .pledge-box { background: var(--bg3); border-radius: var(--radius-sm); padding: 1rem; font-size: 13px; line-height: 1.8; color: var(--text2); margin-bottom: 1rem; border-left: 3px solid var(--green); }
-
-  /* ── Scrollbar ── */
-  .name-grid::-webkit-scrollbar { width: 4px; }
-  .name-grid::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
-  /* ── Responsive ── */
-  @media (max-width: 480px) {
-    .detail-grid { grid-template-columns: 1fr; }
-    .upload-grid { grid-template-columns: 1fr; }
-    .stat-grid { gap: 6px; }
-    .stat-num { font-size: 22px; }
-  }
-</style>
-</head>
-<body>
-
-<!-- ════════════════════════════════════════
-     LOGIN SCREEN
-════════════════════════════════════════ -->
-<div id="loginScreen" class="screen active">
-  <div class="login-wrap">
-    <div style="text-align:center; margin-bottom:1.75rem">
-      <div class="login-logo">🛡️</div>
-      <h1 style="font-size:20px; font-weight:700; color:var(--text1)">용접 안전 점검 시스템</h1>
-      <p style="font-size:14px; color:var(--text2); margin-top:5px">실습 전 안전 확인 · 스마트용접과</p>
-    </div>
-
-    <div class="card" style="margin-bottom:10px; background:var(--yellow-light); border-color:#EBD6A8">
-      <p style="font-size:13.5px; color:var(--yellow-text); font-weight:600; line-height:1.6; display:flex; gap:8px; align-items:flex-start">
-        <i class="ti ti-alert-triangle" style="font-size:18px; flex-shrink:0; margin-top:1px"></i>
-        <span>안전점검표는 실습 교시에 작성되어야 하며, 실습 수업이 시작될 때마다 작성합니다.</span>
-      </p>
-    </div>
-
-    <div class="card" style="margin-bottom:10px">
-      <label style="margin-bottom:10px">접속 유형 선택</label>
-      <div class="role-grid">
-        <button class="role-btn" id="roleTeacher" onclick="selectRole('teacher')">
-          <span class="emoji">👨🏫</span>
-          <span class="label">교사</span>
-        </button>
-        <button class="role-btn" id="roleStudent" onclick="selectRole('student')">
-          <span class="emoji">🎓</span>
-          <span class="label">학생</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Teacher Login -->
-    <div class="card" id="teacherLoginBox" style="display:none; margin-bottom:10px">
-      <label for="teacherNameInput">교사 이름 입력</label>
-      <input type="text" id="teacherNameInput" placeholder="" autocomplete="off">
-      <label for="teacherPwInput" style="margin-top:12px">비밀번호 입력</label>
-      <input type="password" id="teacherPwInput" placeholder="" autocomplete="off" inputmode="numeric"
-             onkeydown="if(event.key==='Enter') doTeacherLogin()">
-      <div id="teacherErr" class="err-msg"><i class="ti ti-alert-circle"></i> 이름 또는 비밀번호가 올바르지 않습니다</div>
-      <button class="btn btn-primary btn-block" style="margin-top:12px" onclick="doTeacherLogin()">
-        <i class="ti ti-login"></i> 입장하기
-      </button>
-    </div>
-
-    <!-- Student Login -->
-    <div class="card" id="studentLoginBox" style="display:none; margin-bottom:10px">
-      <div style="margin-bottom:12px">
-        <label for="classSelect">① 학년 · 반 선택</label>
-        <select id="classSelect" onchange="renderNameGrid()">
-          <option value="">학년·반을 선택하세요</option>
-          <option value="1학년 스마트용접1">1학년 스마트용접 1반</option>
-          <option value="1학년 스마트용접2">1학년 스마트용접 2반</option>
-          <option value="2학년 스마트용접1">2학년 스마트용접 1반</option>
-          <option value="2학년 스마트용접2">2학년 스마트용접 2반</option>
-          <option value="3학년 스마트용접1">3학년 스마트용접 1반</option>
-          <option value="3학년 스마트용접2">3학년 스마트용접 2반</option>
-        </select>
-      </div>
-      <div id="nameGridWrap" style="display:none">
-        <label style="margin-bottom:8px">② 본인 이름 선택</label>
-        <div id="nameGrid" class="name-grid"></div>
-        <div id="selectedNameShow" style="display:none; margin-top:10px; padding:9px 14px; background:var(--green-light); border-radius:var(--radius-sm); color:var(--green-text); font-size:14px; font-weight:600"></div>
-      </div>
-      <div id="studentErr" class="err-msg"><i class="ti ti-alert-circle"></i> 학년·반과 이름을 모두 선택해 주세요</div>
-      <button class="btn btn-primary btn-block" style="margin-top:12px" onclick="doStudentLogin()">
-        <i class="ti ti-login"></i> 입장하기
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════
-     STUDENT SCREEN
-════════════════════════════════════════ -->
-<div id="studentScreen" class="screen">
-  <div class="stu-wrap">
-    <div class="header-bar">
-      <div class="header-logo">🛡️</div>
-      <div>
-        <p style="font-size:16px; font-weight:700; color:var(--text1)" id="stuNameDisplay"></p>
-        <p style="font-size:13px; color:var(--text2)" id="stuClassDisplay"></p>
-      </div>
-      <button class="btn btn-sm" style="margin-left:auto" onclick="logout()"><i class="ti ti-logout"></i> 나가기</button>
-    </div>
-
-    <div class="step-dots">
-      <span class="step-dot active" id="dot0"></span>
-      <span class="step-dot" id="dot1"></span>
-      <span class="step-dot" id="dot2"></span>
-      <span class="step-dot" id="dot3"></span>
-      <span style="font-size:12px; color:var(--text2); margin-left:4px" id="stepLabel">1 / 4 단계</span>
-    </div>
-
-    <!-- STEP 0: 방염복 · 안전화 -->
-    <div id="stuStep0" class="card" style="margin-bottom:1rem">
-      <p class="sec-label" style="margin-bottom:1rem">① 보호복 및 안전화 착용 여부</p>
-      <div class="check-item">
-        <div class="check-icon" style="background:var(--green-light)">🧥</div>
-        <div style="flex:1">
-          <p style="font-weight:600">방염복 착용</p>
-          <p style="font-size:13px; color:var(--text2); margin-top:2px">불꽃·스패터 방호용 방염 작업복</p>
-          <div class="check-toggle">
-            <button class="toggle-btn" id="c0-y" onclick="setCheck(0,'y')">✓ 착용함</button>
-            <button class="toggle-btn" id="c0-n" onclick="setCheck(0,'n')">✗ 미착용</button>
-          </div>
-        </div>
-      </div>
-      <div class="check-item">
-        <div class="check-icon" style="background:var(--blue-light)">👢</div>
-        <div style="flex:1">
-          <p style="font-weight:600">안전화 착용</p>
-          <p style="font-size:13px; color:var(--text2); margin-top:2px">불꽃·스패터 방염을 위한 안전화</p>
-          <div class="check-toggle">
-            <button class="toggle-btn" id="c1-y" onclick="setCheck(1,'y')">✓ 착용함</button>
-            <button class="toggle-btn" id="c1-n" onclick="setCheck(1,'n')">✗ 미착용</button>
-          </div>
-        </div>
-      </div>
-      <button class="btn btn-primary btn-sm" style="margin-top:1rem" onclick="nextStep(1)">다음 <i class="ti ti-arrow-right"></i></button>
-    </div>
-
-    <!-- STEP 1: 보호장구 -->
-    <div id="stuStep1" class="card" style="margin-bottom:1rem; display:none">
-      <p class="sec-label" style="margin-bottom:1rem">② 보호장구 준비 여부</p>
-      <div id="gearChecks"></div>
-      <button class="btn btn-primary btn-sm" style="margin-top:1rem" onclick="nextStep(2)">다음 <i class="ti ti-arrow-right"></i></button>
-    </div>
-
-    <!-- STEP 2: 사진 업로드 -->
-    <div id="stuStep2" class="card" style="margin-bottom:1rem; display:none">
-      <p class="sec-label" style="margin-bottom:1rem">③ 착용 상태 사진 업로드</p>
-      <div class="upload-grid">
-        <div>
-          <p style="font-size:13px; font-weight:600; color:var(--text1); margin-bottom:6px">방염복 + 안전화</p>
-          <div class="upload-area">
-            <input type="file" accept="image/*" capture="environment" onchange="handleImg(0,this)">
-            <i class="ti ti-camera" style="font-size:28px; color:var(--text3)"></i>
-            <p style="font-size:12px; color:var(--text2); margin-top:5px">사진 촬영 또는 선택</p>
-          </div>
-          <img id="prev0" class="preview-img" alt="착용사진">
-        </div>
-        <div>
-          <p style="font-size:13px; font-weight:600; color:var(--text1); margin-bottom:6px">보호장구 전체</p>
-          <div class="upload-area">
-            <input type="file" accept="image/*" capture="environment" onchange="handleImg(1,this)">
-            <i class="ti ti-camera" style="font-size:28px; color:var(--text3)"></i>
-            <p style="font-size:12px; color:var(--text2); margin-top:5px">사진 촬영 또는 선택</p>
-          </div>
-          <img id="prev1" class="preview-img" alt="장구사진">
-        </div>
-      </div>
-      <p style="font-size:12px; color:var(--text3); margin-top:8px"><i class="ti ti-info-circle"></i> 사진은 선택 사항입니다. 건너뛰어도 됩니다.</p>
-      <button class="btn btn-primary btn-sm" style="margin-top:1rem" onclick="nextStep(3)">다음 <i class="ti ti-arrow-right"></i></button>
-    </div>
-
-    <!-- STEP 3: 서약 + 서명 -->
-    <div id="stuStep3" class="card" style="margin-bottom:1rem; display:none">
-      <p class="sec-label" style="margin-bottom:1rem">④ 안전 서약 및 자필 서명</p>
-      <div class="pledge-box">
-        본인은 용접 실습 전 방염복, 안전화, 보호장구를 모두 착용·준비하였으며,<br>
-        안전 수칙을 숙지하고 이를 준수할 것을 확인합니다.
-      </div>
-      <div class="sig-header">
-        <p style="font-size:13px; font-weight:600; color:var(--text1)">아래 서명란에 자필 서명</p>
-        <button class="btn btn-sm" onclick="clearSig()"><i class="ti ti-eraser"></i> 지우기</button>
-      </div>
-      <canvas id="sigCanvas" width="460" height="155"></canvas>
-      <button class="btn btn-primary btn-block" style="margin-top:1rem" onclick="submitCheck()">
-        <i class="ti ti-check"></i> 점검 완료 제출
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════
-     TEACHER SCREEN
-════════════════════════════════════════ -->
-<div id="teacherScreen" class="screen">
-  <div class="teacher-wrap">
-    <div class="header-bar">
-      <div class="header-logo">👨🏫</div>
-      <div>
-        <p style="font-size:16px; font-weight:700; color:var(--text1)" id="teacherNameDisplay"></p>
-        <p style="font-size:13px; color:var(--text2)" id="todayDate"></p>
-      </div>
-      <button class="btn btn-sm" style="margin-left:auto" onclick="logout()"><i class="ti ti-logout"></i> 나가기</button>
-    </div>
-
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-num" id="tStatTotal" style="color:var(--green)">0</div>
-        <div class="stat-label">제출 완료</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num" id="tStatOk" style="color:var(--green)">0</div>
-        <div class="stat-label">모든 항목 통과</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num" id="tStatFail" style="color:var(--red)">0</div>
-        <div class="stat-label">미비 항목 있음</div>
-      </div>
-    </div>
-
-    <div class="tab-bar">
-      <button class="tab active" onclick="switchTab('list')" id="tabList">학생 목록</button>
-      <button class="tab" onclick="switchTab('detail')" id="tabDetail">상세 보기</button>
-    </div>
-
-    <div id="tabListView">
-      <div class="filter-bar" id="classFilters"></div>
-      <div class="card">
-        <div id="studentList">
-          <p class="empty-state"><i class="ti ti-clipboard-list" style="display:block;font-size:32px;margin-bottom:8px"></i>아직 제출된 점검표가 없습니다</p>
-        </div>
-      </div>
-    </div>
-
-    <div id="tabDetailView" style="display:none">
-      <div id="detailContent" class="card">
-        <p class="empty-state">목록에서 학생을 선택하면<br>상세 내용이 표시됩니다</p>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Success Modal -->
-<div class="modal-overlay" id="successModal">
-  <div class="modal-box">
-    <div style="font-size:56px; margin-bottom:12px">✅</div>
-    <h2 style="font-size:19px; font-weight:700; margin-bottom:8px">점검 완료!</h2>
-    <p style="font-size:14px; color:var(--text2); margin-bottom:1.5rem; line-height:1.7">안전 점검이 성공적으로 제출되었습니다.<br>안전한 실습 되세요! 🔥</p>
-    <button class="btn btn-primary btn-block" onclick="afterSubmit()">확인</button>
-  </div>
-</div>
-
-<script>
-// ══════════════════════════════════════
-// CONFIG
-// ══════════════════════════════════════
-const CONFIG = {
-  // 구글 Apps Script 웹앱 배포 후 받은 주소(/exec)를 아래 따옴표 안에 붙여넣으세요.
-  // 비워두면 인터넷 전송 없이 이 기기에만 저장됩니다.
-  GAS_URL: ''
-};
-
-// ══════════════════════════════════════
-// DATA
-// ══════════════════════════════════════
-const TEACHERS = ['김재훈'];
-const TEACHER_PW = { '김재훈': '1219' };
-
-const STUDENTS_DB = {
-  '1학년 스마트용접1': ['권태근','기현진','김규범','김도근','김동군','김태현','남태훈','남호성','박상윤','박찬희','배지원','유도현','이민호','이윤성','이재훈','이지호','조성민','최운혁','탁은석','한재황','황이랑'],
-  '1학년 스마트용접2': ['강현서','김도연','김민우','김민재','김민호','김주현','김하랑','김호영','노재경','박병하','박재혁','서민규','엄준호','오다호','오우빈','장서진','장하율','전재현','전주원','황선권'],
-  '2학년 스마트용접1': ['권시훈','김도경','김도현','박준형','박창민','배병욱','석승준','손기택','송원우','송태훈','시장호','신정원','윤민준','윤승기','이동혁','이지성','이지호','임정현','임종윤','정성재','차영환','최주역','최지수'],
-  '2학년 스마트용접2': ['김명섭','박정우','변시우','서우진','이상우','이승빈','이준혁','정성주','정준형','정현경','조현욱','한재호'],
-  '3학년 스마트용접1': ['권우혁','라경도','박성빈','박용하','박정훈','박지완','박현동','서현준','서형인','서훈영','안우섭','이동욱','이우진','이하균','전민서','주성민','천동주','최시우','최정민'],
-  '3학년 스마트용접2': ['김명민','김민성','김민재','김민철','김태영','노은찬','마서현','손윤서','이승훈','정서원','채수민','최신','최은유','최주현']
-};
-
-const GEARS = [
-  { id:'helmet', icon:'⛑️', name:'용접 헬멧', desc:'자동 차광 헬멧 또는 핸드실드' },
-  { id:'hood',   icon:'🧣', name:'두건(용접모)', desc:'머리·목 방호용 내열 두건' },
-  { id:'gaiter', icon:'🦵', name:'각반', desc:'하퇴부 스패터 방호 각반' },
-  { id:'sleeve', icon:'💪', name:'용접 토시', desc:'팔·손목 방호용 가죽 토시' },
-  { id:'apron',  icon:'🦺', name:'용접 앞치마', desc:'전면 방호용 가죽 앞치마' }
-];
-
-// ══════════════════════════════════════
-// STATE
-// ══════════════════════════════════════
-let state = { curUser: null, role: null, curClass: null, selectedName: null, checks: [null, null], gears: {}, imgs: [null, null] };
-let submissions = {};
-let activeFilter = '전체';
-
-// ══════════════════════════════════════
-// SCREEN UTILS
-// ══════════════════════════════════════
-function show(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-
-function selectRole(r) {
-  document.getElementById('teacherLoginBox').style.display = r === 'teacher' ? 'block' : 'none';
-  document.getElementById('studentLoginBox').style.display = r === 'student' ? 'block' : 'none';
-  document.getElementById('teacherErr').style.display = 'none';
-  document.getElementById('studentErr').style.display = 'none';
-  ['roleTeacher', 'roleStudent'].forEach(id => document.getElementById(id).classList.remove('selected'));
-  document.getElementById(r === 'teacher' ? 'roleTeacher' : 'roleStudent').classList.add('selected');
-}
-
-// ══════════════════════════════════════
-// TEACHER LOGIN
-// ══════════════════════════════════════
-function doTeacherLogin() {
-  const name = document.getElementById('teacherNameInput').value.trim();
-  const pw   = document.getElementById('teacherPwInput').value.trim();
-  if (TEACHERS.includes(name) && TEACHER_PW[name] === pw) {
-    state = { curUser: name, role: 'teacher' };
-    document.getElementById('teacherNameDisplay').textContent = name + ' 선생님';
-    document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
-    renderTeacher();
-    show('teacherScreen');
-  } else {
-    document.getElementById('teacherErr').style.display = 'block';
-  }
-}
-
-// ══════════════════════════════════════
-// STUDENT LOGIN
-// ══════════════════════════════════════
-function renderNameGrid() {
-  const cls = document.getElementById('classSelect').value;
-  const wrap = document.getElementById('nameGridWrap');
-  const grid = document.getElementById('nameGrid');
-  const sel  = document.getElementById('selectedNameShow');
-  state.selectedName = null;
-  sel.style.display = 'none';
-  if (!cls) { wrap.style.display = 'none'; return; }
-  wrap.style.display = 'block';
-  const names = STUDENTS_DB[cls] || [];
-  grid.innerHTML = names.map(n =>
-    `<button class="name-chip" onclick="selectName('${n}',this)">${n}</button>`
-  ).join('');
-}
-
-function selectName(name, el) {
-  document.querySelectorAll('.name-chip').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  state.selectedName = name;
-  const sel = document.getElementById('selectedNameShow');
-  sel.textContent = '선택: ' + name;
-  sel.style.display = 'block';
-}
-
-function doStudentLogin() {
-  const cls  = document.getElementById('classSelect').value;
-  const name = state.selectedName;
-  if (!cls || !name) { document.getElementById('studentErr').style.display = 'block'; return; }
-  document.getElementById('studentErr').style.display = 'none';
-  state = { curUser: name, role: 'student', curClass: cls, selectedName: name, checks: [null,null], gears: {}, imgs: [null,null] };
-  document.getElementById('stuNameDisplay').textContent = name + ' 학생';
-  document.getElementById('stuClassDisplay').textContent = cls.replace('스마트용접', '스마트용접 ') + '반';
-  initStudent();
-  show('studentScreen');
-}
-
-// ══════════════════════════════════════
-// LOGOUT
-// ══════════════════════════════════════
-function logout() {
-  state = { curUser: null, role: null, selectedName: null };
-  document.getElementById('teacherNameInput').value = '';
-  document.getElementById('classSelect').value = '';
-  document.getElementById('nameGridWrap').style.display = 'none';
-  document.getElementById('selectedNameShow').style.display = 'none';
-  document.getElementById('teacherErr').style.display = 'none';
-  document.getElementById('studentErr').style.display = 'none';
-  document.getElementById('teacherLoginBox').style.display = 'none';
-  document.getElementById('studentLoginBox').style.display = 'none';
-  ['roleTeacher','roleStudent'].forEach(id => document.getElementById(id).classList.remove('selected'));
-  document.getElementById('successModal').classList.remove('open');
-  show('loginScreen');
-}
-
-// ══════════════════════════════════════
-// STUDENT FLOW
-// ══════════════════════════════════════
-function initStudent() {
-  [0,1,2,3].forEach(i => {
-    document.getElementById('stuStep'+i).style.display = i === 0 ? 'block' : 'none';
-  });
-  updateDots(0);
-  state.checks = [null, null]; state.gears = {}; state.imgs = [null, null];
-  ['c0-y','c0-n','c1-y','c1-n'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.className = 'toggle-btn';
-  });
-  document.getElementById('gearChecks').innerHTML = GEARS.map(g => `
-    <div class="check-item">
-      <div class="check-icon" style="background:var(--yellow-light)">${g.icon}</div>
-      <div style="flex:1">
-        <p style="font-weight:600">${g.name}</p>
-        <p style="font-size:13px; color:var(--text2); margin-top:2px">${g.desc}</p>
-        <div class="check-toggle">
-          <button class="toggle-btn" id="g-${g.id}-y" onclick="setGear('${g.id}','y')">✓ 있음</button>
-          <button class="toggle-btn" id="g-${g.id}-n" onclick="setGear('${g.id}','n')">✗ 없음</button>
-        </div>
-      </div>
-    </div>`).join('');
-  ['prev0','prev1'].forEach(id => { const el = document.getElementById(id); el.style.display='none'; el.src=''; });
-  document.getElementById('successModal').classList.remove('open');
-  initCanvas();
-}
-
-function setCheck(idx, val) {
-  state.checks[idx] = val;
-  const keys = idx === 0 ? ['c0-y','c0-n'] : ['c1-y','c1-n'];
-  document.getElementById(keys[0]).className = 'toggle-btn' + (val==='y' ? ' yes' : '');
-  document.getElementById(keys[1]).className = 'toggle-btn' + (val==='n' ? ' no' : '');
-}
-
-function setGear(id, val) {
-  state.gears[id] = val;
-  document.getElementById('g-'+id+'-y').className = 'toggle-btn' + (val==='y' ? ' yes' : '');
-  document.getElementById('g-'+id+'-n').className = 'toggle-btn' + (val==='n' ? ' no' : '');
-}
-
-function nextStep(to) {
-  [0,1,2,3].forEach(i => document.getElementById('stuStep'+i).style.display = 'none');
-  document.getElementById('stuStep'+to).style.display = 'block';
-  updateDots(to);
-  if (to === 3) initCanvas();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function updateDots(a) {
-  [0,1,2,3].forEach(i => {
-    const d = document.getElementById('dot'+i);
-    d.className = 'step-dot' + (i < a ? ' done' : (i === a ? ' active' : ''));
-  });
-  document.getElementById('stepLabel').textContent = (a+1) + ' / 4 단계';
-}
-
-function handleImg(idx, input) {
-  const f = input.files[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = e => {
-    state.imgs[idx] = e.target.result;
-    const p = document.getElementById('prev'+idx);
-    p.src = e.target.result; p.style.display = 'block';
-  };
-  r.readAsDataURL(f);
-}
-
-// ── Signature ──
-let sigDrawing = false, sigCtx = null;
-function initCanvas() {
-  const c = document.getElementById('sigCanvas'); if (!c) return;
-  sigCtx = c.getContext('2d');
-  sigCtx.strokeStyle = '#1A1D23'; sigCtx.lineWidth = 2.5; sigCtx.lineCap = 'round'; sigCtx.lineJoin = 'round';
-  sigCtx.clearRect(0, 0, c.width, c.height);
-  c.onpointerdown = e => {
-    sigDrawing = true;
-    const r = c.getBoundingClientRect(), sx = c.width / r.width;
-    sigCtx.beginPath(); sigCtx.moveTo((e.clientX-r.left)*sx, (e.clientY-r.top)*sx);
-    e.preventDefault();
-  };
-  c.onpointermove = e => {
-    if (!sigDrawing) return;
-    const r = c.getBoundingClientRect(), sx = c.width / r.width;
-    sigCtx.lineTo((e.clientX-r.left)*sx, (e.clientY-r.top)*sx); sigCtx.stroke();
-    e.preventDefault();
-  };
-  c.onpointerup = () => { sigDrawing = false; };
-  c.onpointerleave = () => { sigDrawing = false; };
-}
-function clearSig() { if (sigCtx) { const c = document.getElementById('sigCanvas'); sigCtx.clearRect(0,0,c.width,c.height); } }
-
-// ── Submit ──
-function submitCheck() {
-  const c = document.getElementById('sigCanvas');
-  const now = new Date();
-  // 시스템(서버/기기) 날짜를 자동 기록 — 학생이 임의로 바꿀 수 없음
-  const dateISO = now.getFullYear() + '-' +
-                  String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                  String(now.getDate()).padStart(2, '0');
-  const sub = {
-    key: dateISO + '_' + state.curClass + '_' + state.curUser, // 날짜별로 1건씩 기록
-    date: dateISO,
-    cls: state.curClass,
-    name: state.curUser,
-    time: now.toLocaleString('ko-KR'),
-    timeRaw: now,
-    checks: [...state.checks],
-    gears: { ...state.gears },
-    imgs: [...state.imgs],
-    sig: c.toDataURL()
-  };
-  submissions[sub.key] = sub;
-  saveLocal();          // 새로고침 후에도 유지 (localStorage)
-  sendToSheet(sub);     // 구글 시트로 전송 (인터넷 공유)
-  document.getElementById('successModal').classList.add('open');
-}
-
-// ── localStorage 영속화 ──
-function saveLocal() {
-  try { localStorage.setItem('weld_submissions', JSON.stringify(submissions)); } catch (e) {}
-}
-function loadLocal() {
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
   try {
-    const raw = localStorage.getItem('weld_submissions');
-    if (raw) submissions = JSON.parse(raw);
-  } catch (e) {}
-}
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-// ── 구글 Apps Script(무료 백엔드)로 전송 ──
-// CONFIG.GAS_URL 에 배포한 웹앱 주소를 넣으면 자동으로 구글 시트에 일별 저장됩니다.
-function sendToSheet(sub) {
-  if (!CONFIG.GAS_URL) return; // 주소 미설정 시 로컬 저장만 수행
-  const allOk = sub.checks[0] === 'y' && sub.checks[1] === 'y' &&
-                Object.values(sub.gears).every(v => v === 'y');
-  const payload = {
-    date: sub.date,
-    time: sub.time,
-    cls: sub.cls,
-    name: sub.name,
-    bangyeom: sub.checks[0] === 'y' ? '착용' : '미착용',
-    safetyShoes: sub.checks[1] === 'y' ? '착용' : '미착용',
-    gears: GEARS.map(g => g.name + ':' + (sub.gears[g.id] === 'y' ? 'O' : 'X')).join(', '),
-    result: allOk ? '이상없음' : '미비있음',
-    photo1: sub.imgs[0] || '',
-    photo2: sub.imgs[1] || '',
-    sig: sub.sig || ''
-  };
-  fetch(CONFIG.GAS_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload)
-  }).catch(err => console.warn('시트 전송 실패(로컬에는 저장됨):', err));
-}
+    // 날짜(YYYY-MM-DD)별 탭(시트)을 찾거나 새로 만든다 — '일별' 정리
+    var tabName = data.date || todayStr_();
+    var sheet = ss.getSheetByName(tabName);
+    if (!sheet) {
+      sheet = ss.insertSheet(tabName);
+      buildHeader_(sheet, tabName);
+    }
 
-function afterSubmit() {
-  document.getElementById('successModal').classList.remove('open');
-  logout();
-}
+    // 사진/서명을 드라이브에 저장하고 링크 생성
+    var folder = getDateFolder_(tabName);
+    var prefix = data.cls + '_' + data.name;
+    var photo1 = saveImage_(folder, data.photo1, prefix + '_사진1');
+    var photo2 = saveImage_(folder, data.photo2, prefix + '_사진2');
+    var sigUrl = saveImage_(folder, data.sig,   prefix + '_서명');
 
-// ══════════════════════════════════════
-// TEACHER DASHBOARD
-// ══════════════════════════════════════
-function renderTeacher() {
-  const subs = Object.values(submissions);
-  document.getElementById('tStatTotal').textContent = subs.length;
-  const ok = subs.filter(s => s.checks[0]==='y' && s.checks[1]==='y' && Object.values(s.gears).every(v=>v==='y')).length;
-  document.getElementById('tStatOk').textContent = ok;
-  document.getElementById('tStatFail').textContent = subs.length - ok;
+    sheet.appendRow([
+      data.time || '',
+      data.cls || '',
+      data.name || '',
+      data.bangyeom || '',
+      data.safetyShoes || '',
+      data.gears || '',
+      data.result || '',
+      photo1,
+      photo2,
+      sigUrl
+    ]);
 
-  // Filter chips
-  const allCls = ['전체','1학년 스마트용접1','1학년 스마트용접2','2학년 스마트용접1','2학년 스마트용접2','3학년 스마트용접1','3학년 스마트용접2'];
-  document.getElementById('classFilters').innerHTML = allCls.map(c =>
-    `<button class="filter-chip${activeFilter===c?' on':''}" onclick="setFilter('${c}')">${c.replace('스마트용접','용접')}</button>`
-  ).join('');
+    // 결과(이상없음/미비있음) 셀 색상 강조
+    var lastRow = sheet.getLastRow();
+    var resCell = sheet.getRange(lastRow, 7);
+    resCell.setBackground(data.result === '이상없음' ? '#D8EFD3' : '#FBE0DF')
+           .setFontColor(data.result === '이상없음' ? '#1E6B3A' : '#A32D2D')
+           .setFontWeight('bold');
 
-  const filtered = activeFilter === '전체' ? subs : subs.filter(s => s.cls === activeFilter);
-  const list = document.getElementById('studentList');
-  if (!filtered.length) {
-    list.innerHTML = '<p class="empty-state"><i class="ti ti-clipboard-list" style="display:block;font-size:32px;margin-bottom:8px"></i>제출된 점검표가 없습니다</p>';
-    return;
+    return json_({ ok: true, sheet: tabName });
+  } catch (err) {
+    return json_({ ok: false, error: String(err) });
+  } finally {
+    lock.releaseLock();
   }
-  list.innerHTML = filtered.map(s => {
-    const allOk = s.checks[0]==='y' && s.checks[1]==='y' && Object.values(s.gears).every(v=>v==='y');
-    const gOk = GEARS.filter(g => s.gears[g.id]==='y').length;
-    const pct  = Math.round((gOk / GEARS.length) * 100);
-    const timeStr = s.time.split(' ').slice(1).join(' ');
-    return `<div class="student-row">
-      <div class="avatar">${s.name.slice(0,1)}</div>
-      <div style="flex:1; min-width:0">
-        <div style="display:flex; align-items:center; gap:7px; margin-bottom:5px; flex-wrap:wrap">
-          <span style="font-size:15px; font-weight:700">${s.name}</span>
-          <span style="font-size:11px; color:var(--text3)">${s.cls.replace('스마트용접','용접')}</span>
-          <span class="badge ${allOk?'badge-ok':'badge-fail'}">${allOk?'✓ 이상없음':'⚠ 미비있음'}</span>
-          <span style="font-size:11px; color:var(--text3); margin-left:auto">${timeStr}</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:8px">
-          <span style="font-size:12px; color:var(--text2); white-space:nowrap">방염복:${s.checks[0]==='y'?'✓':'✗'} 안전화:${s.checks[1]==='y'?'✓':'✗'} 장구:${gOk}/${GEARS.length}</span>
-          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-        </div>
-      </div>
-      <button class="btn btn-sm" onclick="showDetail('${s.key}')">상세 <i class="ti ti-eye"></i></button>
-    </div>`;
-  }).join('');
 }
 
-function setFilter(cls) { activeFilter = cls; renderTeacher(); }
+// 브라우저로 URL을 직접 열었을 때 동작 확인용
+function doGet() {
+  return json_({ ok: true, message: '용접 안전 점검 백엔드 정상 작동 중' });
+}
 
-function showDetail(key) {
-  const s = submissions[key]; if (!s) return;
-  switchTab('detail');
-  const allOk = s.checks[0]==='y' && s.checks[1]==='y' && Object.values(s.gears).every(v=>v==='y');
+/* ---------- 보조 함수 ---------- */
 
-  let html = `
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:1.25rem">
-      <div class="avatar" style="width:50px;height:50px;font-size:18px">${s.name.slice(0,1)}</div>
-      <div>
-        <p style="font-size:18px; font-weight:700">${s.name}</p>
-        <p style="font-size:13px; color:var(--text2)">${s.cls.replace('스마트용접','스마트용접 ')} &nbsp;·&nbsp; ${s.time}</p>
-      </div>
-      <span class="badge ${allOk?'badge-ok':'badge-fail'}" style="margin-left:auto; font-size:13px; padding:6px 12px">${allOk?'✅ 이상없음':'⚠️ 미비있음'}</span>
-    </div>
-    <div class="divider"></div>
-    <p class="sec-label" style="margin-bottom:8px">보호복 착용</p>
-    <div class="detail-grid" style="margin-bottom:1rem">
-      <div class="detail-chip ${s.checks[0]==='y'?'chip-ok':'chip-fail'}">🧥 방염복 ${s.checks[0]==='y'?'✓ 착용':'✗ 미착용'}</div>
-      <div class="detail-chip ${s.checks[1]==='y'?'chip-ok':'chip-fail'}">👢 안전화 ${s.checks[1]==='y'?'✓ 착용':'✗ 미착용'}</div>
-    </div>
-    <p class="sec-label" style="margin-bottom:8px">보호장구 준비</p>
-    <div class="detail-grid" style="margin-bottom:1rem">
-      ${GEARS.map(g => {
-        const ok = s.gears[g.id]==='y';
-        return `<div class="detail-chip ${ok?'chip-ok':'chip-fail'}">${g.icon} ${g.name} ${ok?'✓':'✗'}</div>`;
-      }).join('')}
-    </div>`;
+// 공문서 형식의 머리글(제목 + 열 이름)
+function buildHeader_(sheet, tabName) {
+  sheet.getRange('A1:J1').merge()
+    .setValue('용접 실습 안전 점검표  ·  ' + tabName + '  ·  스마트용접과')
+    .setFontSize(14).setFontWeight('bold')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle')
+    .setBackground('#0F6E56').setFontColor('#FFFFFF');
+  sheet.setRowHeight(1, 38);
 
-  if (s.imgs[0] || s.imgs[1]) {
-    html += `<div class="divider"></div><p class="sec-label" style="margin-bottom:8px">제출 사진</p>
-    <div class="detail-grid" style="margin-bottom:1rem">
-      ${s.imgs[0] ? `<img src="${s.imgs[0]}" style="width:100%;border-radius:var(--radius-sm);max-height:160px;object-fit:cover" alt="방염복사진">` : '<div style="background:var(--bg3);border-radius:var(--radius-sm);height:100px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px">미제출</div>'}
-      ${s.imgs[1] ? `<img src="${s.imgs[1]}" style="width:100%;border-radius:var(--radius-sm);max-height:160px;object-fit:cover" alt="장구사진">` : '<div style="background:var(--bg3);border-radius:var(--radius-sm);height:100px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px">미제출</div>'}
-    </div>`;
+  var headers = ['제출시각', '학년·반', '이름', '방염복', '안전화',
+                 '보호장구(헬멧/두건/각반/토시/앞치마)', '판정',
+                 '착용사진1', '착용사진2', '자필서명'];
+  var hr = sheet.getRange(2, 1, 1, headers.length);
+  hr.setValues([headers])
+    .setFontWeight('bold').setBackground('#EAF3DE').setFontColor('#1A1D23')
+    .setHorizontalAlignment('center').setBorder(true, true, true, true, true, true);
+
+  sheet.setColumnWidth(1, 150);
+  sheet.setColumnWidth(2, 130);
+  sheet.setColumnWidth(3, 80);
+  sheet.setColumnWidth(6, 300);
+  sheet.setColumnWidths(8, 3, 110);
+  sheet.setFrozenRows(2);
+}
+
+// 날짜별 드라이브 하위 폴더 가져오기/생성
+function getDateFolder_(tabName) {
+  var root = getOrCreateFolder_(DriveApp.getRootFolder(), DRIVE_FOLDER);
+  return getOrCreateFolder_(root, tabName);
+}
+function getOrCreateFolder_(parent, name) {
+  var it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+// base64 dataURL 이미지를 드라이브에 저장하고 공유 링크 반환
+function saveImage_(folder, dataUrl, fileName) {
+  if (!dataUrl || dataUrl.indexOf('base64,') < 0) return '';
+  try {
+    var parts = dataUrl.split(',');
+    var meta = parts[0]; // data:image/png;base64
+    var contentType = meta.substring(meta.indexOf(':') + 1, meta.indexOf(';'));
+    var ext = contentType.indexOf('png') >= 0 ? '.png' : '.jpg';
+    var bytes = Utilities.base64Decode(parts[1]);
+    var blob = Utilities.newBlob(bytes, contentType, fileName + ext);
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return file.getUrl();
+  } catch (err) {
+    return '저장실패';
   }
-
-  if (s.sig) {
-    html += `<div class="divider"></div><p class="sec-label" style="margin-bottom:8px">자필 서명</p>
-    <img src="${s.sig}" style="width:100%;border:0.5px solid var(--border);border-radius:var(--radius-sm);background:var(--bg3)" alt="서명">`;
-  }
-
-  document.getElementById('detailContent').innerHTML = html;
 }
 
-function switchTab(tab) {
-  document.getElementById('tabListView').style.display  = tab==='list'   ? 'block' : 'none';
-  document.getElementById('tabDetailView').style.display = tab==='detail' ? 'block' : 'none';
-  document.getElementById('tabList').className   = 'tab' + (tab==='list'   ? ' active' : '');
-  document.getElementById('tabDetail').className = 'tab' + (tab==='detail' ? ' active' : '');
-  if (tab === 'list') renderTeacher();
+function todayStr_() {
+  var d = new Date();
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 }
 
-// ── Keyboard shortcut: Enter to login ──
-document.getElementById('teacherNameInput').addEventListener('keydown', e => { if (e.key === 'Enter') doTeacherLogin(); });
-
-// ── 시작 시 저장된 제출 내역 복원 ──
-loadLocal();
-</script>
-</body>
-</html>
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
